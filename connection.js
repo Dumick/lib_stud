@@ -18,38 +18,28 @@ const oracleConfig = {
     connectionString: "192.168.20.34"
 }
 
-const msConnection = async () => {
+const getData = async (id_stud, id_book) => {
+    const connectMS = await sql.connect(msConfig);
+    const connectOracle = await oracle.getConnection(oracleConfig);
 
-    try {
-        await sql.connect(msConfig)
-        const books = await sql.query(`select * from books`)
-        const loanOfBooks = await sql.query(`select * from loanOfBooks`)
-        return [books, loanOfBooks]
-    } catch (e) {
-        console.log(e)
-    }
-}
-
-const oracleconn = () => { 
-    const student = [];
-    oracle.getConnection(oracleConfig)
-    .then(connection => {
-        connection.execute('select * from student', [], (error, result) => {
-
-            if (result) {
-                // console.log(result)
-                student.push(result)
-            }
-            else
-                console.log(error)
-
+    let countBook, countOverdue, student;
+    await connectMS.query(`select * from loanOfBooks where id_stud=` + id_stud)
+        .then(result => {
+            countBook = result.rowsAffected[0]
+            result.recordset.filter(book => book.Tenure < book.Current_Tenure ? countOverdue =+ 1 : null)
         })
-    })
-    .catch(error => console.log(error))
-    return student
-}
 
+    let connection;
+    await oracle.getConnection(oracleConfig).then((conn) => (connection = conn))
 
+    await connection.execute('select * from student where STUDENT_ID=' + id_stud)
+    .then(res => student = res.rows[0])
 
-msConnection();
-oracleconn()
+    const data = {countBook, countOverdue, studentName: student[2], studentSurname: student[1]}
+        
+        // [16593, 'Петрова', 'Анна', 'ж', '1ФИ' ]]
+    console.log(data);
+
+}   
+
+getData(16593, 38349);
