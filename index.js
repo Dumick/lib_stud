@@ -18,44 +18,31 @@ const oracleConfig = {
     connectionString: "192.168.20.34"
 }
 
-const getData = async () => {
+const getData = async (id_stud, id_book) => {
     const connectMS = await sql.connect(msConfig);
+    const connectOracle = await oracle.getConnection(oracleConfig);
 
-    let countBook, countOverdue, students;
-    // Получаем количество всех книг у студента
-    await connectMS.query(`select id_stud, count(*) count_book from loanOfBooks group by id_stud`)
+    let countBook, countOverdue = 0, student;
+    await connectMS.query(`select * from loanOfBooks where id_stud=` + id_stud)
         .then(result => {
-            countBook = result.recordset;
+            countBook = result.rowsAffected[0]
+            result.recordset.filter(book => book.Tenure < book.Current_Tenure ? countOverdue += 1 : null)
         })
 
-    // Получаем количество просроченных книг
-    await connectMS.query(`select id_stud, count(*) count_overdue_book from loanOfBooks where tenure < current_tenure group by id_stud`)
-        .then(result => {
-            countOverdue = result.recordset;
-        })
-
-    // Склеиваем значения полученые из двух предыдуших запросов
-    students = countBook.map((stud, index) => {
-        return Object.assign({}, stud, countOverdue[index]);
-    })
-
-    // Подключаемся к Oracle
     let connection;
     await oracle.getConnection(oracleConfig).then((conn) => (connection = conn))
 
-    // Полуаем список с информацие о струденте и склеиваем его с предыдушим списком
-    students = students.map(async stud => {
-        let student;
-        await connection.execute('select * from student where STUDENT_ID=' + stud.id_stud)
-            .then(res => student = res.rows[0])
-        return Object.assign({}, stud, {studName: student[1], studLastName: student[2]});
-    })
+    await connection.execute('select * from student where STUDENT_ID=' + id_stud)
+        .then(res => student = res.rows[0])
 
-    console.log(students);
+    const data = {countBook, countOverdue, studentName: student[2], studentSurname: student[1]}
+
     // [16593, 'Петрова', 'Анна', 'ж', '1ФИ' ]]
+    console.log(data);
+
 }
 
-getData();
+getData(16593, 38349);
 
 const updateTenure = async () => {
     const connectMS = await sql.connect(msConfig);
